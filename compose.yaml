@@ -1,0 +1,40 @@
+services:
+  student-mysql-container:
+    image: 'mysql:latest'
+    container_name: user-mysql-container
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: 7221root@20*23@940827
+      MYSQL_DATABASE: user-db
+      MYSQL_USER: dev7hd
+      MYSQL_PASSWORD: 7221dev@20*23@940827
+    ports:
+      - '3306:3306'
+    volumes:
+      - ./linux-files:/debdir
+  payment-mysql-container:
+    image: 'mysql:latest'
+    container_name: payment-mysql-container
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: 7221root@20*23@940827
+      MYSQL_DATABASE: payment-db
+      MYSQL_USER: dev7hd
+      MYSQL_PASSWORD: 7221dev@20*23@940827
+    ports:
+      - '3307:3306'
+    volumes:
+      - ./linux-files:/debdir
+  notification-mysql-container:
+    image: 'mysql:latest'
+    container_name: notification-mysql-container
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: 7221root@20*23@940827
+      MYSQL_DATABASE: notification-db
+      MYSQL_USER: dev7hd
+      MYSQL_PASSWORD: 7221dev@20*23@940827
+    ports:
+      - '3308:3306'
+    volumes:
+      - ./linux-files:/debdir
