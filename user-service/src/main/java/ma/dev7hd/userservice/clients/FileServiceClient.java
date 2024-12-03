@@ -7,8 +7,8 @@ import org.springframework.web.multipart.MultipartFile;
 import org.springframework.http.MediaType;
 import org.springframework.web.bind.annotation.RequestPart;
 
-@FeignClient(name = "photo-service")
-public interface PhotoServiceClient  {
+@FeignClient(name = "file-service")
+public interface FileServiceClient {
     @PostMapping(value = "/process-photo", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     @CircuitBreaker(name = "ProcessPhotoClient", fallbackMethod = "defaultProcessedPhoto")
     byte[] processPhoto(@RequestPart("file") MultipartFile file);
