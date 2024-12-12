@@ -79,11 +79,18 @@
     .stamp-img{
         width: 200px;
     }
+
+    .duplicata{
+        margin-left: 30%;
+    }
     </style>
 </head>
 
 <body>
 <div class="invoice-box">
+    <div class="duplicata">
+        <h2 th:if="${isDuplicata}">**DUPLICATA**</h2>
+    </div>
     <table style="border-spacing: 0; padding: 0;">
         <tr class="top">
             <td colspan="2">

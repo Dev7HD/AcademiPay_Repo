@@ -3,6 +3,9 @@ package ma.dev7hd.userservice.services;
 import ma.dev7hd.userservice.dtos.infoDTOs.InfosAdminDTO;
 import ma.dev7hd.userservice.dtos.infoDTOs.InfosStudentDTO;
 import ma.dev7hd.userservice.dtos.newObjectDTOs.*;
+import ma.dev7hd.userservice.dtos.otherDTOs.ChangePWDTO;
+import ma.dev7hd.userservice.entities.Admin;
+import ma.dev7hd.userservice.entities.Student;
 import ma.dev7hd.userservice.entities.User;
 import ma.dev7hd.userservice.entities.registrations.PendingStudent;
 import ma.dev7hd.userservice.enums.DepartmentName;
@@ -18,7 +21,10 @@ import java.util.List;
 
 public interface IUserService {
     @Transactional
-    User newUser(User newUser);
+    Admin newAdmin(Admin admin, MultipartFile photo) throws IOException;
+
+    @Transactional
+    Student newStudent(Student student, MultipartFile photo) throws IOException;
 
     @Transactional
     ResponseEntity<String> deleteUserById(String id);
@@ -31,17 +37,15 @@ public interface IUserService {
 
     List<InfosStudentDTO> getAllStudents();
 
-    ResponseEntity<InfosStudentDTO> getStudentByCode(String id);
+    ResponseEntity<InfosStudentDTO> getStudentById(String id);
 
     ResponseEntity<InfosStudentDTO> getStudentByEmail(String email);
 
-    List<InfosStudentDTO> getStudentByProgram(ProgramID programID);
+    @Transactional
+    ResponseEntity<String> changePW(ChangePWDTO pwDTO);
 
     @Transactional
-    ResponseEntity<NewAdminDTO> saveAdmin(NewAdminDTO newAdminDTO);
-
-    @Transactional
-    ResponseEntity<InfosStudentDTO> saveStudent(NewStudentDTO studentDTO, MultipartFile photo) throws IOException;
+    ResponseEntity<String> resetPW(String targetUserId);
 
     List<InfosAdminDTO> getAdmins();
 
@@ -57,6 +61,9 @@ public interface IUserService {
     ResponseEntity<PendingStudent> getPendingStudentByEmail(String email);
 
     @Transactional
+    ResponseEntity<?> approvingStudentRegistration(String email) throws IOException;
+
+    @Transactional
     ResponseEntity<String> declineStudentRegistration(String email) throws IOException;
 
     @Transactional
@@ -65,8 +72,22 @@ public interface IUserService {
     @Transactional
     ResponseEntity<InfosStudentDTO> updateStudentInfo(UpdateStudentInfoDTO studentDTO);
 
+    ResponseEntity<String> updateStudentPhoto(MultipartFile photo) throws IOException;
+
+    @Transactional
+    ResponseEntity<String> approveMultipleRegistrations(List<String> emails);
+
+    ResponseEntity<String> banMultipleRegistrations(List<String> emails);
+
     @Transactional
     void declineMultipleRegistrations(List<String> emails);
 
+    @Transactional
+    ResponseEntity<String> deleteMultipleUsers(List<String> ids);
+
+    ResponseEntity<String> resetPasswordToMultipleUsers(List<String> ids);
+
     void toggleUsersAccounts(List<String> ids);
+
+    ResponseEntity<?> getProfilePicture(String id) throws IOException;
 }

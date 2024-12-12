@@ -22,4 +22,7 @@ public interface PendingStudentRepository extends JpaRepository<PendingStudent, 
 
     @Query("SELECT p.photo FROM PendingStudent p WHERE p.email IN :emails")
     List<String> findAllPhotosById(List<String> emails);
+
+    void deleteAllByEmailIn(List<String> emails);
+
 }

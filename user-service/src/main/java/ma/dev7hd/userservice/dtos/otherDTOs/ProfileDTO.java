@@ -1,4 +1,4 @@
-package ma.dev7hd.userservice.dtos;
+package ma.dev7hd.userservice.dtos.otherDTOs;
 
 import lombok.Getter;
 import lombok.Setter;

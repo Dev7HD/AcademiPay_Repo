@@ -3,6 +3,8 @@ package ma.dev7hd.userservice.dtos.infoDTOs;
 import lombok.Getter;
 import lombok.Setter;
 
+import java.util.Date;
+
 @Getter
 @Setter
 public class InfosUserDTO {
@@ -10,6 +12,7 @@ public class InfosUserDTO {
     private String email;
     private String firstName;
     private String lastName;
-    private boolean enabled;
-    private String photo;
+    private boolean isEnabled;
+    private String photoId;
+    private Date registerDate;
 }

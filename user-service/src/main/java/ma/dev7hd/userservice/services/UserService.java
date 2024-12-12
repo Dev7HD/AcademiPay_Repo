@@ -2,10 +2,12 @@ package ma.dev7hd.userservice.services;
 
 import lombok.AllArgsConstructor;
 import ma.dev7hd.userservice.clients.NotificationClient;
-import ma.dev7hd.userservice.clients.PhotoServiceClient;
+import ma.dev7hd.userservice.clients.FileServiceClient;
+import ma.dev7hd.userservice.converters.ByteArrayMultipartFile;
 import ma.dev7hd.userservice.dtos.infoDTOs.InfosAdminDTO;
 import ma.dev7hd.userservice.dtos.infoDTOs.InfosStudentDTO;
 import ma.dev7hd.userservice.dtos.newObjectDTOs.*;
+import ma.dev7hd.userservice.dtos.otherDTOs.ChangePWDTO;
 import ma.dev7hd.userservice.entities.Admin;
 import ma.dev7hd.userservice.entities.Student;
 import ma.dev7hd.userservice.entities.User;
@@ -19,10 +21,8 @@ import ma.dev7hd.userservice.repositories.registrations.PendingStudentRepository
 import ma.dev7hd.userservice.repositories.users.AdminRepository;
 import ma.dev7hd.userservice.repositories.users.StudentRepository;
 import ma.dev7hd.userservice.repositories.users.UserRepository;
+import ma.dev7hd.userservice.services.global.IUserDataProvider;
 import org.apache.commons.io.FilenameUtils;
-import org.keycloak.admin.client.resource.RealmResource;
-import org.keycloak.admin.client.resource.UsersResource;
-import org.keycloak.representations.idm.CredentialRepresentation;
 import org.springframework.data.crossstore.ChangeSetPersister;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
@@ -53,47 +53,82 @@ public class UserService implements IUserService {
     private final PendingStudentRepository pendingStudentRepository;
     private final BanedRegistrationRepository banedRegistrationRepository;
     private final IUserMapper userMapper;
-    private final PhotoServiceClient photoServiceClient;
+    private final FileServiceClient photoServiceClient;
     private final NotificationClient notificationClient;
+    private final IUserDataProvider iUserDataProvider;
+    private final IClientService clientService;
+    private final FileServiceClient fileServiceClient;
 
     private final Path PATH_TO_PHOTOS = Paths.get(System.getProperty("user.home"), "data", "photos");
     private final Path PATH_TO_REGISTRATION_PHOTOS = Paths.get(System.getProperty("user.home"), "data", "registrations_photos");
-
     private final ExecutorService executorService = Executors.newFixedThreadPool(Runtime.getRuntime().availableProcessors());
-    private final IClientService clientService;
 
     @Transactional
     @Override
-    public User newUser(User newUser) {
-
-        User savedUser = null;
-
-        Optional<User> user = userRepository.findByEmail(newUser.getEmail());
+    public Admin newAdmin(Admin admin, MultipartFile photo) throws IOException {
+        Optional<User> user = userRepository.findByEmail(admin.getEmail());
         if (user.isPresent()) {
             throw new RuntimeException("User already exists");
         }
 
-        // Save client to the database
-        if (newUser instanceof Admin admin) {
-            admin.setId(admin.getLastName().toUpperCase().substring(0,2) + (int)(Math.random() * 100000 + 100000));
-            admin.setFirstName(admin.getFirstName());
-            admin.setLastName(admin.getLastName());
-            admin.setEmail(admin.getEmail());
-            admin.setUserName(admin.getFirstName() + "." + newUser.getLastName());
-            admin.setDepartmentName(admin.getDepartmentName());
-            savedUser = userRepository.save(admin);
-        } else if (newUser instanceof Student student) {
-            // "123456" Must be changed with an auto increment value.
-            student.setId(student.getLastName().toUpperCase().substring(0,2) + "123456");
-            student.setFirstName(student.getFirstName());
-            student.setLastName(student.getLastName());
-            student.setEmail(student.getEmail());
-            student.setUserName(student.getFirstName() + "." + student.getLastName());
-            student.setProgramId(student.getProgramId());
-            savedUser = userRepository.save(student);
+        if(photo == null){
+            throw new IOException("User photo mustn't be null");
         }
-        clientService.saveClientAndRegisterWithKeycloak(savedUser);
-        return savedUser;
+
+        String adminId = iUserDataProvider.generateAdminId(admin.getLastName());
+
+        System.out.println("ADMIN INIT...");
+
+        admin.setId(adminId);
+
+        UUID photoId = fileServiceClient.processUserPhoto(photo, adminId);
+        admin.setPhotoId(photoId);
+
+        admin.setEnabled(true);
+
+        clientService.registerUserWithKeycloak(admin);
+
+        Admin savedAdmin = userRepository.save(admin);
+        System.out.println(savedAdmin);
+
+        return savedAdmin;
+
+    }
+
+    @Transactional
+    @Override
+    public Student newStudent(Student student, MultipartFile photo) throws IOException {
+
+        Optional<User> user = userRepository.findByEmail(student.getEmail());
+        if (user.isPresent()) {
+            throw new RuntimeException("User already exists");
+        }
+
+        if(photo == null){
+            throw new IOException("User photo mustn't be null");
+        }
+
+        System.out.println("STUDENT INIT...");
+        String studentId = iUserDataProvider.generateStudentId(student.getProgramId());
+
+        student.setId(studentId);
+        UUID photoId = fileServiceClient.processUserPhoto(photo, studentId);
+        student.setPhotoId(photoId);
+
+        student.setEnabled(true);
+
+        System.out.println("*******************");
+        System.out.println("photo id "+photoId);
+        System.out.println("student photo id "+student.getPhotoId());
+        System.out.println("*******************");
+
+        clientService.registerUserWithKeycloak(student);
+
+        Student savedStudent = userRepository.save(student);
+        System.out.println(savedStudent);
+
+
+        return savedStudent;
     }
 
     @Transactional
@@ -102,7 +137,7 @@ public class UserService implements IUserService {
         Optional<User> optionalUser = userRepository.findById(id);
         if (optionalUser.isPresent()) {
             User user = optionalUser.get();
-            clientService.deleteKCUser(user.getEmail());
+            clientService.deleteKCUser(user.getId());
             userRepository.delete(user);
             return ResponseEntity.ok().body("User deleted successfully");
         } else {
@@ -116,22 +151,26 @@ public class UserService implements IUserService {
         return adminRepository.findById(adminDTO.getId())
                 .map(admin -> {
                     clientService.updateKCUser(admin);
-                    admin.setFirstName(adminDTO.getFirstName());
-                    admin.setLastName(adminDTO.getLastName());
-                    admin.setDepartmentName(adminDTO.getDepartmentName());
+                    if(adminDTO.getEmail() != null && !adminDTO.getEmail().isBlank() && !adminDTO.getEmail().isEmpty()) admin.setEmail(adminDTO.getEmail());
+                    if(adminDTO.getFirstName() != null && !adminDTO.getFirstName().isBlank() && !adminDTO.getFirstName().isEmpty()) admin.setFirstName(adminDTO.getFirstName());
+                    if(adminDTO.getLastName() != null && !adminDTO.getLastName().isBlank() && !adminDTO.getLastName().isEmpty()) admin.setLastName(adminDTO.getLastName());
+                    if(adminDTO.getDepartmentName() != null) admin.setDepartmentName(adminDTO.getDepartmentName());
                     Admin saved = adminRepository.save(admin);
                     return userMapper.convertUpdatedAdminToDto(saved);
                 })
                 .orElse(null);
     }
 
-
-
     @Transactional
     @Override
     public boolean toggleUserAccount(String email) throws ChangeSetPersister.NotFoundException {
         return userRepository.findByEmail(email)
-                .map(user -> clientService.toggleKCUserAccount(user.getEmail()))
+                .map(user -> {
+                    boolean isEnabled = clientService.toggleKCUserAccount(user.getEmail());
+                    user.setEnabled(isEnabled);
+                    userRepository.save(user);
+                    return isEnabled;
+                })
                 .orElseThrow(ChangeSetPersister.NotFoundException::new);
     }
 
@@ -144,7 +183,7 @@ public class UserService implements IUserService {
     }
 
     @Override
-    public ResponseEntity<InfosStudentDTO> getStudentByCode(String id) {
+    public ResponseEntity<InfosStudentDTO> getStudentById(String id) {
         Optional<Student> optionalStudent = studentRepository.findById(id);
         if (optionalStudent.isPresent()) {
             Student student = optionalStudent.get();
@@ -166,62 +205,31 @@ public class UserService implements IUserService {
     }
 
     @Override
-    public List<InfosStudentDTO> getStudentByProgram(ProgramID programID){
-        List<Student> students = studentRepository.findStudentByProgramId(programID);
-        if(students.isEmpty()){
-            return List.of();
-        } else {
-            return students.stream()
-                    .map(userMapper::convertStudentToDto)
-                    .toList();
-        }
-    }
-
-    @Transactional
-    @Override
-    public ResponseEntity<NewAdminDTO> saveAdmin(NewAdminDTO newAdminDTO) {
-        Admin admin = newAdminProcessing(userMapper.convertNewAdminDtoToAdmin(newAdminDTO));
-        clientService.saveClientAndRegisterWithKeycloak(admin);
-        userRepository.save(admin);
-        return ResponseEntity.ok().body(newAdminDTO);
-    }
-
-    @Transactional
-    @Override
-    public ResponseEntity<InfosStudentDTO> saveStudent(NewStudentDTO studentDTO, MultipartFile photo) throws IOException {
-        Student student = newStudentProcessing(userMapper.convertStudentDtoToStudent(studentDTO));
-        byte[] resizedPhoto = photoServiceClient.processPhoto(photo);
-        String savePhotoUri = savePhoto(resizedPhoto, student.getId());
-        student.setPhoto(savePhotoUri);
-        Student saved = userRepository.save(student);
-        return ResponseEntity.ok().body(userMapper.convertStudentToDto(saved));
-    }
-
-    /*@Override
     @Transactional
     public ResponseEntity<String> changePW(ChangePWDTO pwDTO){
-        String userId = SecurityContextHolder.getContext().getAuthentication().getName();
-        Optional<User> optionalUser = userRepository.findById(userId);
-        if (optionalUser.isPresent()) {
-            User user = optionalUser.get();
-            return processPasswordChange(user, pwDTO);
+        User loggedUser = iUserDataProvider.getCurrentUser().orElse(null);
+        if (loggedUser != null) {
+            boolean isOldPWCorrect = clientService.verifyPassword(loggedUser.getEmail(), pwDTO.getOldPassword());
+            if(isOldPWCorrect){
+                return processPasswordChange(loggedUser, pwDTO.getNewPassword());
+            }
+            return ResponseEntity.badRequest().body("Old password not correct.");
         } else {
-            return ResponseEntity.badRequest().build();
+            return ResponseEntity.status(401).body("Not authenticated/User not found.");
         }
-    }*/
+    }
 
-    /*@Override
+    @Override
     @Transactional
     public ResponseEntity<String> resetPW(String targetUserId){
         Optional<User> optionalTargetUser = userRepository.findById(targetUserId);
-        String loggedInUserId = iUserDataProvider.getCurrentUserId();
         if (optionalTargetUser.isPresent()) {
             User targetUser = optionalTargetUser.get();
-            return processPasswordReset(targetUser, loggedInUserId);
+            return processPasswordReset(targetUser);
         } else {
             return ResponseEntity.badRequest().build();
         }
-    }*/
+    }
 
     @Override
     public List<InfosAdminDTO> getAdmins(){
@@ -231,13 +239,13 @@ public class UserService implements IUserService {
 
     @Override
     public Page<InfosAdminDTO> getAdminsByCriteria(String id, String email, String firstName, String lastName, DepartmentName departmentName, int page, int size){
-        Page<Admin> admins = adminRepository.findByFilter(id, email, firstName, lastName, departmentName, PageRequest.of(page, size));
+        Page<Admin> admins = adminRepository.findByFilter(id.toLowerCase(), email.toLowerCase(), firstName.toLowerCase(), lastName.toLowerCase(), departmentName, PageRequest.of(page, size));
         return userMapper.convertPageableAdminToDTO(admins);
     }
 
     @Override
     public Page<InfosStudentDTO> getStudentsByCriteriaAsAdmin(String id, String email, String firstName, String lastName, ProgramID programID, int page, int size){
-        Page<Student> students = studentRepository.findByFilter(id, email, firstName, lastName, programID, PageRequest.of(page, size));
+        Page<Student> students = studentRepository.findByFilter(id.toLowerCase(), email.toLowerCase(), firstName.toLowerCase(), lastName.toLowerCase(), programID, PageRequest.of(page, size));
         return userMapper.convertPageableStudentToDTO(students);
     }
 
@@ -245,11 +253,18 @@ public class UserService implements IUserService {
     @Override
     public ResponseEntity<String> registerStudent(NewPendingStudentDTO pendingStudentDTO, MultipartFile photo) throws IOException {
         boolean userIsExistByEmail = userRepository.existsByEmail(pendingStudentDTO.getEmail());
+        System.out.println("userIsExistByEmail: " + userIsExistByEmail);
         boolean pendingStudentExistByEmail = pendingStudentRepository.existsById(pendingStudentDTO.getEmail());
+        System.out.println("pendingStudentExistByEmail: " + pendingStudentExistByEmail);
         boolean bannedExistById = banedRegistrationRepository.existsById(pendingStudentDTO.getEmail());
+        System.out.println("bannedExistById: " + bannedExistById);
 
         if (userIsExistByEmail || pendingStudentExistByEmail || bannedExistById) {
             return ResponseEntity.badRequest().body("Email or Code already in use or banned");
+        }
+
+        if (photo == null){
+            return ResponseEntity.badRequest().body("You must provide your profile picture");
         }
         String fileName = UUID.randomUUID().toString();
         String extension = FilenameUtils.getExtension(photo.getOriginalFilename());
@@ -272,17 +287,17 @@ public class UserService implements IUserService {
         pendingStudent.setRegisterDate(new Date());
 
         PendingStudent savedPendingStudent = pendingStudentRepository.save(pendingStudent);
-        notificationClient.pushStudentRegistration(savedPendingStudent);
+//        notificationClient.pushStudentRegistration(savedPendingStudent);
 
-        return ResponseEntity.ok().body("The registration was successful.");
+        return ResponseEntity.ok().body("The registration was successful. Please wait to be approved.");
     }
 
     @Override
     public Page<PendingStudent> getPendingStudent(String email, int page, int size){
         Page<PendingStudent> pendingStudents = pendingStudentRepository.findByPendingStudentsByFilter(email, PageRequest.of(page, size));
-        if (!pendingStudents.getContent().isEmpty()){
+        /*if (!pendingStudents.getContent().isEmpty()){
             notificationClient.adminNotificationSeen(pendingStudents.getContent().getFirst().getEmail());
-        }
+        }*/
         return pendingStudents;
     }
 
@@ -291,7 +306,7 @@ public class UserService implements IUserService {
         Optional<PendingStudent> optionalPendingStudent = pendingStudentRepository.findById(email);
         if (optionalPendingStudent.isPresent()) {
             PendingStudent pendingStudent = optionalPendingStudent.get();
-            notificationClient.adminNotificationSeen(pendingStudent.getEmail());
+//            notificationClient.adminNotificationSeen(pendingStudent.getEmail());
             return ResponseEntity.ok(pendingStudent);
         }
         return ResponseEntity.notFound().build();
@@ -299,22 +314,21 @@ public class UserService implements IUserService {
 
     @Override
     @Transactional
-    public ResponseEntity<?> approvingStudentRegistration( String email) throws IOException {
+    public ResponseEntity<?> approvingStudentRegistration(String email) throws IOException {
         Optional<PendingStudent> optionalPendingStudent = pendingStudentRepository.findById(email);
         if (optionalPendingStudent.isPresent()) {
             if (!studentRepository.existsByEmail(optionalPendingStudent.get().getEmail())){
                 PendingStudent pendingStudent = optionalPendingStudent.get();
 
-                Student approvedStudent = newStudentProcessing(convertPendingStudentToStudent(pendingStudent));
+                Student studentToBeApproved = newStudentProcessing(userMapper.convertPendingStudentToStudent(pendingStudent));
 
-                String photo = photoProcessingForApprovedStudent(pendingStudent.getPhoto(), approvedStudent.getId());
+                UUID photoId = photoProcessingForApprovedStudent(pendingStudent.getPhoto(), studentToBeApproved.getId());
 
-                approvedStudent.setPhoto(photo);
+                studentToBeApproved.setPhotoId(photoId);
 
-                Files.deleteIfExists(Path.of(URI.create(pendingStudent.getPhoto())));
-                Student savedStudent = studentRepository.save(approvedStudent);
+                Student savedStudent = studentRepository.save(studentToBeApproved);
                 pendingStudentRepository.delete(pendingStudent);
-                return ResponseEntity.ok().body(convertStudentToDto(savedStudent));
+                return ResponseEntity.ok().body(userMapper.convertStudentToDto(savedStudent));
             }
             return ResponseEntity.badRequest().body("Student already registered.");
         } else {
@@ -322,12 +336,17 @@ public class UserService implements IUserService {
         }
     }
 
-    private String photoProcessingForApprovedStudent(String pendingStudentPhotoUri , String studentCode) throws IOException {
+    private UUID photoProcessingForApprovedStudent(String pendingStudentPhotoUri , String studentId) throws IOException {
         byte[] photo = Files.readAllBytes(Path.of(URI.create(pendingStudentPhotoUri)));
-        byte[] resizedPhoto = imageService.resizeImageWithAspectRatio(photo);
-        String savedPhoto = savePhoto(resizedPhoto, studentCode);
-        deletePhoto(pendingStudentPhotoUri);
-        return savedPhoto;
+        MultipartFile multiPartPhoto = new ByteArrayMultipartFile(photo, "photo", "Original photo", "image/jpeg");
+
+        UUID photoId = fileServiceClient.processUserPhoto(multiPartPhoto, studentId);
+        if(photoId != null){
+            deletePhoto(pendingStudentPhotoUri);
+            return photoId;
+        } else {
+            throw new IOException("Processing photo error.");
+        }
     }
 
     @Transactional
@@ -353,9 +372,8 @@ public class UserService implements IUserService {
     @Transactional
     @Override
     public ResponseEntity<String> banStudentRegistration(String email) throws IOException {
-        String userEmail = SecurityContextHolder.getContext().getAuthentication().getName();
+        Optional<Admin> optionalUser = iUserDataProvider.getCurrentAdmin();
         Optional<PendingStudent> optionalPendingStudent = pendingStudentRepository.findById(email);
-        Optional<User> optionalUser = userRepository.findById(userEmail);
         if (optionalPendingStudent.isPresent() && optionalUser.isPresent() && optionalUser.get() instanceof Admin admin) {
             PendingStudent pendingStudent = optionalPendingStudent.get();
 
@@ -380,19 +398,23 @@ public class UserService implements IUserService {
         Optional<Student> optionalStudent = studentRepository.findById(studentDTO.getId());
         if (optionalStudent.isPresent()) {
             Student student = optionalStudent.get();
-            student.setFirstName(studentDTO.getFirstName());
-            student.setLastName(studentDTO.getLastName());
-            student.setProgramId(studentDTO.getProgramId());
+            if (studentDTO.getEmail() != null && !studentDTO.getEmail().isEmpty() && !studentDTO.getEmail().isBlank()) student.setEmail(studentDTO.getEmail());
+            if(studentDTO.getFirstName() != null && !studentDTO.getFirstName().isEmpty() && !studentDTO.getFirstName().isBlank()) student.setFirstName(studentDTO.getFirstName());
+            if(studentDTO.getLastName() != null && !studentDTO.getLastName().isEmpty() && !studentDTO.getLastName().isBlank()) student.setLastName(studentDTO.getLastName());
+            if(studentDTO.getProgramId() != null) student.setProgramId(studentDTO.getProgramId());
             Student savedStudentInfo = studentRepository.save(student);
-            Student.updateProgramCountsFromDB(student.getProgramId(), -1.0);
-            Student.updateProgramCountsFromDB(studentDTO.getProgramId(), 1.0);
+
+            if (studentDTO.getProgramId() != null){
+                Student.updateProgramCountsFromDB(student.getProgramId(), -1L);
+                Student.updateProgramCountsFromDB(studentDTO.getProgramId(), 1L);
+            }
             return ResponseEntity.ok(userMapper.convertStudentToDto(savedStudentInfo));
         }
         return ResponseEntity.badRequest().build();
     }
 
     @Override
-    public byte[] updateStudentPhoto(MultipartFile photo) throws IOException {
+    public ResponseEntity<String> updateStudentPhoto(MultipartFile photo) throws IOException {
         User user = iUserDataProvider.getCurrentUser()
                 .orElseThrow(() -> new RuntimeException("User not found"));
 
@@ -403,19 +425,13 @@ public class UserService implements IUserService {
         }
 
         // Resize the photo
-        byte[] resizedPhoto = imageService.resizeImageWithAspectRatio(photo.getBytes());
+        UUID photoId = fileServiceClient.processUserPhoto(photo, userId);
 
-        // Save photo and update user's photo path
-        String savedPhotoPath = savePhoto(resizedPhoto, userId);
-        if (savedPhotoPath == null) {
-            throw new IOException("Failed to save photo");
+        if(photoId != null){
+            return ResponseEntity.ok("User photo successfully updated.");
+        } else {
+            return ResponseEntity.badRequest().body("User photo update failed");
         }
-
-        user.setPhoto(savedPhotoPath);
-        userRepository.save(user);
-
-        // Read and return the saved photo bytes
-        return Files.readAllBytes(Path.of(URI.create(savedPhotoPath)));
     }
 
 
@@ -438,11 +454,10 @@ public class UserService implements IUserService {
                             !allEmails.contains(registration.getEmail())
                     ).map(registration -> {
                         Student approvedStudent ;
-
                         try {
-                            approvedStudent = newStudentProcessing(convertPendingStudentToStudent(registration));
-                            String photo = photoProcessingForApprovedStudent(registration.getPhoto(), approvedStudent.getId());
-                            approvedStudent.setPhoto(photo);
+                            approvedStudent = newStudentProcessing(userMapper.convertPendingStudentToStudent(registration));
+                            UUID photoId = photoProcessingForApprovedStudent(registration.getPhoto(), approvedStudent.getId());
+                            approvedStudent.setPhotoId(photoId);
                         } catch (IOException e) {
                             throw new RuntimeException(e);
                         }
@@ -540,39 +555,35 @@ public class UserService implements IUserService {
     @Transactional
     @Override
     public void declineMultipleRegistrations(List<String> emails) {
-        List<String> allPhotos = pendingStudentRepository.findAllPhotosById(emails);
+        List<PendingStudent> pendingStudentList = pendingStudentRepository.findAllById(emails);
 
         // Handle potential photo deletion errors
-        allPhotos.forEach(photo -> {
+        pendingStudentList.forEach(p -> {
             try {
-                deletePhoto(photo);
+                deletePhoto(p.getPhoto());
             } catch (IOException e) {
-                System.out.println("Failed to delete photo: " + photo + ". Error: " + e.getMessage());
+                System.err.println("Failed to delete photo: " + p.getPhoto() + ". Error: " + e.getMessage());
             }
         });
 
         // Proceed to delete registrations after attempting photo deletion
-        pendingStudentRepository.deleteAllById(emails);
+        pendingStudentRepository.deleteAll(pendingStudentList);
     }
 
     @Override
     @Transactional
     public ResponseEntity<String> deleteMultipleUsers(List<String> ids) {
-        List<User> users = userRepository.findAllById(ids);
+        List<User> users = userRepository.findAllByIdIn(ids);
         if (users.isEmpty()) {
             return ResponseEntity.badRequest().body("Emails provided are not valid.");
         }
 
         // Parallel processing of photo deletion for Student users
-        users.stream()
-                .filter(user -> user instanceof Student && user.getPhoto() != null)
-                .forEach(user -> {
-                    try {
-                        deletePhoto(user.getPhoto());
-                    } catch (IOException e) {
-                        System.out.println("Failed to delete photo for user: " + user.getEmail());
-                    }
-                });
+        deletePhotos(ids);
+
+        users.parallelStream().forEach(user -> {
+            clientService.deleteKCUser(user.getId());
+        });
 
         userRepository.deleteAll(users);
 
@@ -586,22 +597,26 @@ public class UserService implements IUserService {
         return ResponseEntity.ok(message);
     }
 
+    private void deletePhotos(List<String> usersIds){
+        fileServiceClient.deletePhotos(usersIds);
+    }
 
-    /*@Override
+
+    @Override
     public ResponseEntity<String> resetPasswordToMultipleUsers(List<String> ids) {
         List<User> users = userRepository.findAllById(ids);
         users.forEach(user -> {
-
+            clientService.changeUserPassword(user.getId());
         });
         userRepository.saveAll(users);
         return ResponseEntity.ok(users.size() + " password(s) has been reset successfully.");
-    }*/
+    }
 
     @Override
     public void toggleUsersAccounts(List<String> ids){
         List<User> users = userRepository.findAllById(ids);
         if (!users.isEmpty()) {
-            users.forEach(user -> {
+            users.parallelStream().forEach(user -> {
                 try {
                     toggleUserAccount(user.getEmail());
                 } catch (ChangeSetPersister.NotFoundException e) {
@@ -612,28 +627,19 @@ public class UserService implements IUserService {
     }
 
     @Override
-    public PictureDTO getProfilePicture(String id) throws IOException {
-        Optional<Student> optionalStudent = studentRepository.findById(id);
-        if (optionalStudent.isPresent()) {
-            Student student = optionalStudent.get();
-            PictureDTO pictureDTO = new PictureDTO();
-            pictureDTO.setPicture(Files.readAllBytes(Path.of(URI.create(student.getPhoto()))));
-            pictureDTO.setPictureName(student.getId());
-            return pictureDTO;
-        }
-        return null;
+    public ResponseEntity<byte[]> getProfilePicture(String id) {
+        Optional<User> optionalUser = userRepository.findById(id);
+        return optionalUser.map(student -> fileServiceClient.getUserPhoto(student.getId())).orElse(null);
     }
 
     //PRIVATE METHODS
 
     private Student newStudentProcessing(Student student) throws IOException {
-        String studentId = iUserDataProvider.generateStudentId(student.getProgramId(), null);
-
-        student.setPasswordChanged(false);
-        student.setEnabled(true);
+        String studentId = iUserDataProvider.generateStudentId(student.getProgramId());
         student.setId(studentId);
-        student.setPassword(passwordEncoder.encode(DEFAULT_PASSWORD));
-        Student.updateProgramCountsFromDB(student.getProgramId(),1.0);
+        student.setEnabled(true);
+        clientService.registerUserWithKeycloak(student);
+        Student.updateProgramCountsFromDB(student.getProgramId(),1L);
         return student;
     }
 
@@ -653,40 +659,16 @@ public class UserService implements IUserService {
         return file.toURI().toString();
     }
 
-    private Admin newAdminProcessing(Admin admin){
-        String adminId = iUserDataProvider.generateAdminId(admin.getLastName());
-        admin.setId(adminId);
-        return admin;
-    }
-
-
-
     private ResponseEntity<String> processPasswordChange(User user, String newPW) {
-
-        RealmResource realmResource = keycloak.realm(realm);
-        UsersResource usersResource = realmResource.users();
-
-        // Retrieve the user by username
-        String username = user.getEmail();
-        String userId = usersResource.searchByEmail(username, true).get(0).getId(); // Ensure the username exists
-
-        // Create the new password representation
-        CredentialRepresentation credential = new CredentialRepresentation();
-        credential.setType(CredentialRepresentation.PASSWORD);
-        credential.setValue(newPW);
-        credential.setTemporary(false); // Set to true if you want the user to change it on next login
-
-        // Set the new password for the user
-        usersResource.get(userId).resetPassword(credential);
-
-        System.out.println("Password updated successfully for user: " + username);
-        return ResponseEntity.ok("Password updated successfully for user: " + username);
+        clientService.changeUserPassword(user.getId(), newPW);
+        System.out.println("Password updated successfully for user ID: " + user.getId());
+        return ResponseEntity.ok("Password updated successfully for user ID: " + user.getId());
     }
 
-    private ResponseEntity<String> processPasswordReset(User targetUser, String loggedInUserId) {
-            processPasswordChange(targetUser, DEFAULT_PASSWORD);
-            return ResponseEntity.ok("Password has been reset");
+    private ResponseEntity<String> processPasswordReset(User user) {
+        clientService.changeUserPassword(user.getId());
+        System.out.println("Password has benn reset successfully for user ID: " + user.getId());
+        return ResponseEntity.ok("Password has benn reset successfully for user ID: " + user.getId());
     }
-
 
 }

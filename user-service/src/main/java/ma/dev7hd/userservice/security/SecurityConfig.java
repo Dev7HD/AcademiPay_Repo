@@ -20,19 +20,19 @@ import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 
 import java.util.*;
 
-@Configuration
+/*@Configuration
 @EnableWebSecurity
-@EnableMethodSecurity(prePostEnabled = true)
+@EnableMethodSecurity(prePostEnabled = true)*/
 public class SecurityConfig {
 
-    private final JwtAuthConverter jwtAuthConverter;
+    /*private final JwtAuthConverter jwtAuthConverter;
 
     public SecurityConfig(JwtAuthConverter jwtAuthConverter) {
         this.jwtAuthConverter = jwtAuthConverter;
-    }
+    }*/
 
-    @Bean
-    public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
+    //@Bean
+    /*public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
 
         return http.cors(Customizer.withDefaults())
                 .csrf(Customizer.withDefaults())
@@ -44,9 +44,9 @@ public class SecurityConfig {
                 .oauth2ResourceServer(ors->ors.jwt(jwt->jwt.jwtAuthenticationConverter(jwtAuthConverter)))
                 .sessionManagement(sm->sm.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .build();
-    }
+    }*/
 
-    @Bean
+    //@Bean
     public GrantedAuthoritiesMapper userAuthoritiesMapper() {
         return (authorities) -> {
             final Set<GrantedAuthority> mappedAuthorities = new HashSet<>();

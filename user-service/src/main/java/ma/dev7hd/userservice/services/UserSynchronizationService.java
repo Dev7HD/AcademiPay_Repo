@@ -10,13 +10,13 @@ import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.stereotype.Service;
 
-@Service
-@AllArgsConstructor
+//@Service
+//@AllArgsConstructor
 public class UserSynchronizationService {
 
-    private final UserRepository userRepository;
+    /*private final UserRepository userRepository;
 
-    @EventListener(AuthenticationSuccessEvent.class)
+    //@EventListener(AuthenticationSuccessEvent.class)
     public void onAuthenticationSuccessEvent(final AuthenticationSuccessEvent event) throws JsonProcessingException {
         Jwt jwt = (Jwt) event.getAuthentication().getCredentials();
 
@@ -34,7 +34,7 @@ public class UserSynchronizationService {
         } else if (event.getAuthentication().getAuthorities().toString().contains("STUDENT")) {
             System.out.println("The logged-in user has 'STUDENT' role");
         }
-    }
+    }*/
 
 
 }

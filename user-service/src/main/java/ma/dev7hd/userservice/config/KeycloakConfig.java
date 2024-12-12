@@ -10,26 +10,28 @@ import org.springframework.context.annotation.Configuration;
 @Configuration
 public class KeycloakConfig {
 
-    @Value("${spring.security.oauth2.client.registration.keycloak.client-id}")
-    private String clientId;
+//    @Value("${spring.security.oauth2.client.registration.keycloak.client-id}")
+    public static String clientId = "dev_client";
 
-    @Value("${spring.security.oauth2.client.registration.keycloak.client-secret}")
-    private String clientSecret;
+//    @Value("${spring.security.oauth2.client.registration.keycloak.client-secret}")
+    public static String clientSecret = "75AQAD1ZuaT5Bb9czR4s7etUDgxgfnrg";
 
-    @Value("${user.username}")
-    private String username;
+//    @Value("${user.username}")
+    private String username = "dev7hd";
 
-    @Value("${user.pw}")
-    private String password;
+//    @Value("${user.pw}")
+    private String password = "1234";
 
-    @Value("${keycloak.realm}")
-    public static String realm;
+    //@Value("${keycloak.realm}")
+    public static String realm = "dev-test-realm";
+
+    public static String kcServerUrl = "http://localhost:8080/";
 
 
     @Bean
     public Keycloak keycloak() {
         return KeycloakBuilder.builder()
-                .serverUrl("http://localhost:8080/")       // Replace with your Keycloak server URL
+                .serverUrl(kcServerUrl)       // Replace with your Keycloak server URL
                 .realm(realm)                          // Use "master" for admin, or your custom realm
                 .clientId(clientId)                    // "admin-cli" is typically used for admin access
                 .clientSecret(clientSecret)

@@ -7,6 +7,7 @@ import jakarta.validation.constraints.Pattern;
 import lombok.*;
 
 import java.util.Date;
+import java.util.UUID;
 
 @Entity
 @Inheritance(strategy = InheritanceType.SINGLE_TABLE)
@@ -19,14 +20,11 @@ import java.util.Date;
 @Table(name = "users-table")
 public class User {
     @Id
-    @Pattern(regexp = "[a-z]{2,3}[0-9]{6,8}",
+    @Pattern(regexp = "[a-z]{2,3}[0-9]{8,9}",
             flags = Pattern.Flag.CASE_INSENSITIVE,
             message = "Code invalid format"
     )
     private String id;
-
-    @Column(unique = true)
-    private String userName;
 
     @Email(regexp = "[a-z]+[a-z0-9._%+-]+@[a-z]{2,3}[a-z0-9.-]+.[a-z]{2,3}",
             flags = Pattern.Flag.CASE_INSENSITIVE,
@@ -43,9 +41,11 @@ public class User {
     @Pattern(regexp = "^[A-Za-z]+(?:['-][A-Za-z]+)*$")
     private String lastName;
 
-    private String photo;
+    private UUID photoId;
 
     private Date registerDate;
+
+    private boolean isEnabled;
 
     @PrePersist
     void initRegisterDate(){

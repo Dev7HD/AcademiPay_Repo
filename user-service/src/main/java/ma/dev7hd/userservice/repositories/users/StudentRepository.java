@@ -19,24 +19,23 @@ public interface StudentRepository extends JpaRepository<Student,String> {
 
     Optional<Student> findByEmail(String email);
 
-    boolean existsById( String id);
+    boolean existsById(String id);
 
     @Query("SELECT s FROM Student s WHERE " +
-            "(:email IS NULL OR s.email LIKE %:email%) AND " +
-            "(:id IS NULL OR s.id LIKE :id%) AND " +
-            "(:firstName IS NULL OR s.firstName LIKE %:firstName%) AND " +
-            "(:lastName IS NULL OR s.lastName LIKE %:lastName%) AND " +
-            "(:id IS NULL OR :id = '' OR s.id like :id%) AND " +
+            "(:id IS NULL OR :id = '' OR LOWER(s.id) LIKE :id%) AND " +
+            "(:email IS NULL OR LOWER(s.email) LIKE %:email%) AND " +
+            "(:firstName IS NULL OR LOWER(s.firstName) LIKE %:firstName%) AND " +
+            "(:lastName IS NULL OR LOWER(s.lastName) LIKE %:lastName%) AND " +
             "(:programId IS NULL OR s.programId = :programId)")
     Page<Student> findByFilter(
-            @Param("email") String email,
             @Param("id") String id,
+            @Param("email") String email,
             @Param("firstName") String firstName,
             @Param("lastName") String lastName,
             @Param("programId") ProgramID programID,
             Pageable pageable);
 
-    Integer countByProgramId(ProgramID programId);
+    Long countByProgramId(ProgramID programId);
 
     @Query("SELECT s.email FROM Student s")
     Set<String> findAllEmails();

@@ -9,6 +9,7 @@
         <outputRelativeToContentRoot value="true" />
         <module name="user-service" />
         <module name="config-service" />
+        <module name="file-service" />
         <module name="gateway-service" />
         <module name="discovery-service" />
       </profile>
@@ -18,6 +19,7 @@
     <option name="ADDITIONAL_OPTIONS_OVERRIDE">
       <module name="config-service" options="-parameters" />
       <module name="discovery-service" options="-parameters" />
+      <module name="file-service" options="-parameters" />
       <module name="gateway-service" options="-parameters" />
       <module name="user-service" options="-parameters" />
     </option>

@@ -1,10 +1,7 @@
 package ma.dev7hd.userservice.entities;
 
 import jakarta.persistence.*;
-import lombok.AllArgsConstructor;
-import lombok.Getter;
-import lombok.NoArgsConstructor;
-import lombok.Setter;
+import lombok.*;
 import ma.dev7hd.userservice.enums.ProgramID;
 
 import java.util.*;
@@ -15,36 +12,21 @@ import java.util.*;
 @NoArgsConstructor
 @Getter
 @Setter
+@ToString
 public class Student extends User {
 
     @Enumerated(EnumType.STRING)
     private ProgramID programId;
 
-    public static Map<ProgramID, List<Double>> programIDCounter = new EnumMap<>(ProgramID.class);
+    public static Map<ProgramID, Long> programIDCounter = new EnumMap<>(ProgramID.class);
 
-    public static Integer totalStudents = 0;
+    public static void updateProgramCountsFromDB(ProgramID programID, Long differenceValue) {
 
-    public static void updateProgramCountsFromDB(ProgramID programID, Double differenceValue) {
-        totalStudents += differenceValue.intValue();
+        Long counter = programIDCounter.getOrDefault(programID, 0L );
 
-        List<Double> values = programIDCounter.getOrDefault(programID, new ArrayList<>(Arrays.asList(0.0, 0.0)));
+        counter += differenceValue;
 
-        double updatedTotal = values.get(0) + differenceValue;
-        values.set(0, updatedTotal);
+        programIDCounter.put(programID, counter);
 
-        double updatedPercentage = updatedTotal / totalStudents;
-        values.set(1, updatedPercentage);
-
-        programIDCounter.put(programID, values);
-
-        for (ProgramID otherProgramID : ProgramID.values()) {
-            if (!programID.equals(otherProgramID)) {
-                programIDCounter.computeIfPresent(otherProgramID, (k, valuesList) -> {
-                    double totalForOtherProgram = valuesList.get(0);
-                    valuesList.set(1, totalForOtherProgram / totalStudents);
-                    return valuesList;
-                });
-            }
-        }
     }
 }
