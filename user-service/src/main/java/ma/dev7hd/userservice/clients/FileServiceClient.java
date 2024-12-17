@@ -1,6 +1,7 @@
 package ma.dev7hd.userservice.clients;
 
 import io.github.resilience4j.circuitbreaker.annotation.CircuitBreaker;
+import ma.dev7hd.userservice.config.FeignClientConfig;
 import ma.dev7hd.userservice.entities.Student;
 import org.springframework.cloud.openfeign.FeignClient;
 import org.springframework.http.HttpHeaders;
@@ -15,7 +16,7 @@ import java.io.InputStream;
 import java.util.List;
 import java.util.UUID;
 
-@FeignClient(name = "file-service")
+@FeignClient(name = "file-service", configuration = FeignClientConfig.class)
 public interface FileServiceClient {
 
     @PostMapping(value = "/profiles/student-profile")
@@ -32,7 +33,15 @@ public interface FileServiceClient {
 
     @GetMapping(value = "/photos/{id}", produces = MediaType.IMAGE_JPEG_VALUE)
     @CircuitBreaker(name = "photoGetProcessClient", fallbackMethod = "defaultUserPhoto")
-    ResponseEntity<byte[]> getUserPhoto(@PathVariable(name = "id") String userId);
+    ResponseEntity<byte[]> getUserPhoto(@PathVariable(name = "id") UUID photoId);
+
+    @GetMapping("/photos/default")
+    @CircuitBreaker(name = "photoGetProcessClient", fallbackMethod = "defaultUserPhotoId")
+    UUID getDefaultPhotoId();
+
+    default UUID defaultUserPhotoId(Exception e) {
+        return null;
+    }
 
     default void defaultPhotoDelete(List<String> usersIds, Exception e){
         System.err.println("File service not available.");
@@ -49,10 +58,6 @@ public interface FileServiceClient {
 
     default ResponseEntity<byte[]> defaultUserPhoto(String userId, Exception e) throws IOException {
         HttpHeaders headers = new HttpHeaders();
-        System.out.println("***************************************");
-        System.out.println(e.toString());
-        System.err.println(e.getMessage());
-        System.out.println("***************************************");
         headers.add("Content-Disposition", "inline; filename=default-user-avatar");
 
         byte[] defaultUserAvatar;

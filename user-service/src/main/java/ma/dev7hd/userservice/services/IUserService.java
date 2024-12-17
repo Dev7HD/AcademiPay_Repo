@@ -6,7 +6,6 @@ import ma.dev7hd.userservice.dtos.newObjectDTOs.*;
 import ma.dev7hd.userservice.dtos.otherDTOs.ChangePWDTO;
 import ma.dev7hd.userservice.entities.Admin;
 import ma.dev7hd.userservice.entities.Student;
-import ma.dev7hd.userservice.entities.User;
 import ma.dev7hd.userservice.entities.registrations.PendingStudent;
 import ma.dev7hd.userservice.enums.DepartmentName;
 import ma.dev7hd.userservice.enums.ProgramID;
@@ -30,7 +29,7 @@ public interface IUserService {
     ResponseEntity<String> deleteUserById(String id);
 
     @Transactional
-    UpdateAdminInfoDTO updateAdmin(UpdateAdminInfoDTO adminDTO);
+    ResponseEntity<UpdateAdminInfoDTO> updateAdminInfo(UpdateAdminInfoDTO adminDTO);
 
     @Transactional
     boolean toggleUserAccount(String id) throws ChangeSetPersister.NotFoundException;
@@ -90,4 +89,8 @@ public interface IUserService {
     void toggleUsersAccounts(List<String> ids);
 
     ResponseEntity<?> getProfilePicture(String id) throws IOException;
+
+    void countStudentsByProgramId();
+
+    void countAdmins();
 }

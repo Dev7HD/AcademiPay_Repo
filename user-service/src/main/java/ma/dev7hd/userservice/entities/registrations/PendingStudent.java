@@ -15,18 +15,18 @@ import java.util.Date;
 @Builder
 public class PendingStudent {
     @Id
-    @Email(regexp = "[a-z]+[a-z0-9._%+-]+@[a-z]{2,3}[a-z0-9.-]+.[a-z]{2,3}",
+    @Email(regexp = "^(?=.{1,254}$)(?=.{1,64}@)[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,63}$",
             flags = Pattern.Flag.CASE_INSENSITIVE,
             message = "Invalid email format")
     @NotBlank(message = "Email is mandatory")
     private String email;
 
     @Column(nullable = false, updatable = false)
-    @Pattern(regexp = "^[A-Za-z]+(?:['-][A-Za-z]+)*$")
+    @Pattern(regexp = "^(?=.{3,30}$)[A-Za-z]+(?:['-][A-Za-z]+)*(?:\\s[A-Za-z]+(?:['-][A-Za-z]+)*)*$")
     private String firstName;
 
     @Column(nullable = false, updatable = false)
-    @Pattern(regexp = "^[A-Za-z]+(?:['-][A-Za-z]+)*$")
+    @Pattern(regexp = "^(?=.{3,30}$)[A-Za-z]+(?:['-][A-Za-z]+)*(?:\\s[A-Za-z]+(?:['-][A-Za-z]+)*)*$")
     private String lastName;
 
     @Column(nullable = false, updatable = false)

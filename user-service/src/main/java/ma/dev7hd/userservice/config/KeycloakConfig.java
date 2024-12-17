@@ -3,7 +3,6 @@ package ma.dev7hd.userservice.config;
 import org.keycloak.OAuth2Constants;
 import org.keycloak.admin.client.Keycloak;
 import org.keycloak.admin.client.KeycloakBuilder;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
@@ -14,10 +13,10 @@ public class KeycloakConfig {
     public static String clientId = "dev_client";
 
 //    @Value("${spring.security.oauth2.client.registration.keycloak.client-secret}")
-    public static String clientSecret = "75AQAD1ZuaT5Bb9czR4s7etUDgxgfnrg";
+    public static String clientSecret = "ni5iKWldiYXNHtjNIbfg2nkCwAjxFaLx";
 
 //    @Value("${user.username}")
-    private String username = "dev7hd";
+    private String username = "dev-test-admin";
 
 //    @Value("${user.pw}")
     private String password = "1234";

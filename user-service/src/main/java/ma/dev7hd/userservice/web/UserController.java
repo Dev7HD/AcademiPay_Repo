@@ -14,6 +14,7 @@ import ma.dev7hd.userservice.entities.registrations.PendingStudent;
 import ma.dev7hd.userservice.enums.DepartmentName;
 import ma.dev7hd.userservice.enums.ProgramID;
 import ma.dev7hd.userservice.services.UserService;
+import ma.dev7hd.userservice.services.loadDataFromExcel.ILoadStudentsService;
 import org.springframework.data.crossstore.ChangeSetPersister;
 import org.springframework.data.domain.Page;
 import org.springframework.http.MediaType;
@@ -28,150 +29,152 @@ import java.util.List;
 @AllArgsConstructor
 public class UserController {
     private final UserService userService;
+    private final ILoadStudentsService loadStudentsService;
 
-    @GetMapping("/users/students")
+    @GetMapping(value = "/users/students", produces = MediaType.APPLICATION_JSON_VALUE)
     List<InfosStudentDTO> getStudents(){
         return userService.getAllStudents();
     }
 
-    @GetMapping("/users/admins")
+    @GetMapping(value = "/users/admins", produces = MediaType.APPLICATION_JSON_VALUE)
     List<InfosAdminDTO> getAdmins(){
         return userService.getAdmins();
     }
 
-    @GetMapping("/users/admins/by-criteria")
+    @GetMapping(value = "/users/admins/by-criteria", produces = MediaType.APPLICATION_JSON_VALUE)
     Page<InfosAdminDTO> getAdminsByCriteria(
-            @RequestParam(defaultValue = "") String id,
-            @RequestParam(defaultValue = "") String email,
-            @RequestParam(defaultValue = "") String firstName,
-            @RequestParam(defaultValue = "") String lastName,
-            @RequestParam(defaultValue = "") DepartmentName departmentName,
+            @RequestParam(defaultValue = "", required = false) String id,
+            @RequestParam(defaultValue = "", required = false) String email,
+            @RequestParam(defaultValue = "", required = false) String firstName,
+            @RequestParam(defaultValue = "", required = false) String lastName,
+            @RequestParam(defaultValue = "", required = false) DepartmentName departmentName,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "10") int size){
         return userService.getAdminsByCriteria(id,email,firstName,lastName,departmentName,page,size);
     }
 
-    @GetMapping("/users/students/by-criteria")
+    @GetMapping(value = "/users/students/by-criteria", produces = MediaType.APPLICATION_JSON_VALUE)
     Page<InfosStudentDTO> getStudentsByCriteria(
-            @RequestParam(defaultValue = "") String id,
-            @RequestParam(defaultValue = "") String email,
-            @RequestParam(defaultValue = "") String firstName,
-            @RequestParam(defaultValue = "") String lastName,
-            @RequestParam(defaultValue = "") ProgramID programId,
+            @RequestParam(defaultValue = "", required = false) String id,
+            @RequestParam(defaultValue = "", required = false) String email,
+            @RequestParam(defaultValue = "", required = false) String firstName,
+            @RequestParam(defaultValue = "", required = false) String lastName,
+            @RequestParam(defaultValue = "", required = false) ProgramID programId,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "10") int size) {
         return userService.getStudentsByCriteriaAsAdmin(id, email, firstName, lastName, programId, page, size);
     }
 
-        @GetMapping("/users/id/{id}")
+        @GetMapping(value = "/users/id/{id}", produces = MediaType.APPLICATION_JSON_VALUE)
     ResponseEntity<InfosStudentDTO> getUserById(@PathVariable String id){
         return userService.getStudentById(id);
     }
 
-    @GetMapping("/users/email/{email}")
+    @GetMapping(value = "/users/email/{email}", produces = MediaType.APPLICATION_JSON_VALUE)
     ResponseEntity<InfosStudentDTO> getUserByEmail(@PathVariable String email){
         return userService.getStudentByEmail(email);
     }
 
-    @PostMapping(value = "/users/admins/add", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    @PostMapping(value = "/users/admins/add", consumes = MediaType.MULTIPART_FORM_DATA_VALUE, produces = MediaType.APPLICATION_JSON_VALUE)
     User addAdmin(Admin admin, @RequestPart(value = "photo") MultipartFile photo) throws IOException{
         return userService.newAdmin(admin, photo);
     }
 
-    @PostMapping(value = "/users/students/add", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    @PostMapping(value = "/users/students/add", consumes = MediaType.MULTIPART_FORM_DATA_VALUE, produces = MediaType.APPLICATION_JSON_VALUE)
     User addStudent(Student student, @RequestPart(value = "photo") MultipartFile photo) throws IOException{
         return userService.newStudent(student, photo);
     }
 
-    @DeleteMapping("users/{id}/delete")
+    @DeleteMapping(value = "users/{id}/delete", produces = MediaType.TEXT_PLAIN_VALUE)
     ResponseEntity<String> deleteUserById(@PathVariable String id) {
         return userService.deleteUserById(id);
     }
 
-    @PatchMapping("users/update")
-    UpdateAdminInfoDTO updateAdmin(UpdateAdminInfoDTO adminDTO){
-        return userService.updateAdmin(adminDTO);
+    @PatchMapping(value = "users/admins/update", produces = MediaType.APPLICATION_JSON_VALUE)
+    ResponseEntity<UpdateAdminInfoDTO> updateAdmin(UpdateAdminInfoDTO adminDTO){
+        return userService.updateAdminInfo(adminDTO);
     }
 
-    @PatchMapping("/users/toggleAccount")
-    boolean toggleUserAccount(String email) throws ChangeSetPersister.NotFoundException {
-        return userService.toggleUserAccount(email);
+    @PatchMapping(value = "/users/toggleAccount")
+    ResponseEntity<Boolean> toggleUserAccount(String id) throws ChangeSetPersister.NotFoundException {
+        boolean isEnabled = userService.toggleUserAccount(id);
+        return ResponseEntity.ok(isEnabled);
     }
 
-    @PostMapping(value = "/users/register", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    @PostMapping(value = "/users/students/register", consumes = MediaType.MULTIPART_FORM_DATA_VALUE, produces = MediaType.TEXT_PLAIN_VALUE)
     ResponseEntity<String> registerStudent(NewPendingStudentDTO pendingStudentDTO,@RequestBody MultipartFile photo) throws IOException {
         return userService.registerStudent(pendingStudentDTO, photo);
     }
 
-    @PostMapping("/pending-registrations/approve")
+    @PostMapping(value = "/pending-registrations/approve", produces = {MediaType.APPLICATION_JSON_VALUE, MediaType.TEXT_PLAIN_VALUE})
     ResponseEntity<?> approvingStudentRegistration(String email) throws IOException {
         return userService.approvingStudentRegistration(email);
     }
 
-    @PostMapping("/pending-registrations/decline")
+    @PostMapping(value = "/pending-registrations/decline", produces = MediaType.TEXT_PLAIN_VALUE)
     ResponseEntity<String> declineStudentRegistration(String email) throws IOException {
         return userService.declineStudentRegistration(email);
     }
 
-    @PostMapping("/pending-registrations/ban")
+    @PostMapping(value = "/pending-registrations/ban", produces = MediaType.TEXT_PLAIN_VALUE)
     ResponseEntity<String> banStudentRegistration(String email) throws IOException {
         return userService.banStudentRegistration(email);
     }
 
-    @GetMapping("/pending-registrations/{email}")
+    @GetMapping(value = "/pending-registrations/{email}", produces = MediaType.APPLICATION_JSON_VALUE)
     ResponseEntity<PendingStudent> getPendingStudentByEmail(@PathVariable String email) {
         return userService.getPendingStudentByEmail(email);
     }
 
-    @GetMapping("/pending-registrations")
+    @GetMapping(value = "/pending-registrations", produces = MediaType.APPLICATION_JSON_VALUE)
     Page<PendingStudent> getPendingStudent(
-            @RequestParam(required = false) String email,
+            @RequestParam(defaultValue = "", required = false) String email,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "10") int size) {
         return userService.getPendingStudent(email, page, size);
     }
 
-    @PatchMapping("/users/change-pw")
+    @PatchMapping(value = "/users/change-pw", produces = MediaType.TEXT_PLAIN_VALUE)
     ResponseEntity<String> changePW(ChangePWDTO pwDTO){
         return userService.changePW(pwDTO);
     }
 
-    @PatchMapping("/users/{id}/reset-pw")
+    @PatchMapping(value = "/users/{id}/reset-pw", produces = MediaType.TEXT_PLAIN_VALUE)
     ResponseEntity<String> resetPW(@PathVariable(name = "id") String targetUserId){
         return userService.resetPW(targetUserId);
     }
 
-    @PatchMapping("/users/students/update")
+    @PatchMapping(value = "/users/students/update", produces = MediaType.APPLICATION_JSON_VALUE)
     ResponseEntity<InfosStudentDTO> updateStudentInfo(@RequestBody UpdateStudentInfoDTO infosStudentDTO) {
         return userService.updateStudentInfo(infosStudentDTO);
     }
 
-    @PutMapping(value = "/users/photos/update", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    @PutMapping(value = "/users/photos/update", consumes = MediaType.MULTIPART_FORM_DATA_VALUE, produces = MediaType.TEXT_PLAIN_VALUE)
     ResponseEntity<String> updateStudentPhoto(@RequestPart(value = "photo")MultipartFile photo) throws IOException {
         return userService.updateStudentPhoto(photo);
     }
 
-    @PostMapping("/pending-registrations/approve-multiple")
+    @PostMapping(value = "/pending-registrations/approve-multiple", produces = MediaType.TEXT_PLAIN_VALUE)
     ResponseEntity<String> approveMultipleRegistrations(@RequestBody List<String> emails) {
         return userService.approveMultipleRegistrations(emails);
     }
 
-    @PostMapping("/pending-registrations/ban-multiple")
+    @PostMapping(value = "/pending-registrations/ban-multiple", produces = MediaType.TEXT_PLAIN_VALUE)
     ResponseEntity<String> banMultipleRegistrations(@RequestBody List<String> emails) {
         return userService.banMultipleRegistrations(emails);
     }
 
-    @PostMapping("/pending-registrations/decline-multiple")
+    @PostMapping(value = "/pending-registrations/decline-multiple")
     void declineMultipleRegistrations(@RequestBody List<String> emails) {
         userService.declineMultipleRegistrations(emails);
     }
 
-    @DeleteMapping("users/multiple-delete")
+    @DeleteMapping(value = "users/multiple-delete", produces = MediaType.TEXT_PLAIN_VALUE)
     ResponseEntity<String> deleteMultipleUsers(@RequestBody List<String> ids) {
         return userService.deleteMultipleUsers(ids);
     }
 
-    @PostMapping("/users/multiple-reset-pw")
+    @PostMapping(value = "/users/multiple-reset-pw", produces = MediaType.TEXT_PLAIN_VALUE)
     ResponseEntity<String> resetPasswordToMultipleUsers(@RequestBody List<String> ids) {
         return userService.resetPasswordToMultipleUsers(ids);
     }
@@ -186,6 +189,9 @@ public class UserController {
         return userService.getProfilePicture(id);
     }
 
-
+    @PostMapping(value = "/users/students/add-from-excel", produces = MediaType.TEXT_PLAIN_VALUE, consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    ResponseEntity<String> addStudentsFromExcelFile(@RequestPart(value = "excelFile") MultipartFile excelFile) throws Exception {
+        return loadStudentsService.uploadStudentFile(excelFile);
+    }
 
 }

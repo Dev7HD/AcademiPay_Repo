@@ -8,6 +8,7 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
 import java.util.List;
+import java.util.Optional;
 
 
 public interface PendingStudentRepository extends JpaRepository<PendingStudent, String> {
@@ -18,11 +19,6 @@ public interface PendingStudentRepository extends JpaRepository<PendingStudent, 
             @Param("email") String email,
             Pageable pageable);
 
-    boolean existsById(String email);
-
-    @Query("SELECT p.photo FROM PendingStudent p WHERE p.email IN :emails")
-    List<String> findAllPhotosById(List<String> emails);
-
-    void deleteAllByEmailIn(List<String> emails);
+    Optional<PendingStudent> findByEmailIgnoreCase(String email);
 
 }

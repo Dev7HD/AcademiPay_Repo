@@ -19,5 +19,7 @@ public interface IFileProcessingService {
 
     void deleteUsersPhotos(List<String> usersIds);
 
-    PhotoDTO getUserPhoto(String userId);
+    PhotoDTO getUserPhoto(UUID photoId);
+
+    UUID getDefaultPhotoId();
 }

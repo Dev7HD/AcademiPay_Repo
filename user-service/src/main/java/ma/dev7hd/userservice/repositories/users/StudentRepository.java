@@ -15,9 +15,11 @@ import java.util.Set;
 public interface StudentRepository extends JpaRepository<Student,String> {
     List<Student> findStudentByProgramId(ProgramID programId);
 
-    boolean existsByEmail( String email);
+    boolean existsByEmailIgnoreCase( String email);
 
-    Optional<Student> findByEmail(String email);
+    Optional<Student> findByEmailIgnoreCase(String email);
+
+    Optional<Student> findByIdIgnoreCase(String id);
 
     boolean existsById(String id);
 
@@ -40,7 +42,5 @@ public interface StudentRepository extends JpaRepository<Student,String> {
     @Query("SELECT s.email FROM Student s")
     Set<String> findAllEmails();
 
-    @Query("SELECT MAX(SUBSTRING(s.id, LENGTH(s.id) - 3)) FROM Student s ")
-    Optional<Integer> findLastIdentifier();
 }
 

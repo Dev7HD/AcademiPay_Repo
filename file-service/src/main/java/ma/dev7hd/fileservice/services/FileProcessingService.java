@@ -116,7 +116,7 @@ public class FileProcessingService implements IFileProcessingService{
 
         if (student != null) {
             Optional<UserPhoto> optionalUserPhoto = userPhotoRepository.findByUserId(student.getId());
-            String photoUri = null;
+            String photoUri;
             String studentPhoto = null;
             if (optionalUserPhoto.isPresent()){
                 photoUri = optionalUserPhoto.get().getFileUri();
@@ -283,8 +283,8 @@ public class FileProcessingService implements IFileProcessingService{
     }
 
     @Override
-    public PhotoDTO getUserPhoto(String userId){
-        Optional<UserPhoto> optionalUserPhoto = userPhotoRepository.findByUserId(userId);
+    public PhotoDTO getUserPhoto(UUID photoId){
+        Optional<UserPhoto> optionalUserPhoto = userPhotoRepository.findById(photoId);
         PhotoDTO photoDTO = null;
         if(optionalUserPhoto.isPresent()) {
             UserPhoto userPhoto = optionalUserPhoto.get();
@@ -299,5 +299,11 @@ public class FileProcessingService implements IFileProcessingService{
         }
         return photoDTO;
 
+    }
+
+    @Override
+    public UUID getDefaultPhotoId(){
+        UserPhoto userPhoto = userPhotoRepository.findByFileName("default.jpg").orElseThrow(() -> new RuntimeException("Default photo not found"));
+        return userPhoto.getId();
     }
 }

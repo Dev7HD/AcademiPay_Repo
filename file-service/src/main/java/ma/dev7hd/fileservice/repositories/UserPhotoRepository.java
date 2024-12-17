@@ -13,4 +13,6 @@ public interface UserPhotoRepository extends JpaRepository<UserPhoto, UUID> {
 
     @Query("SELECT p FROM UserPhoto p WHERE p.userId IN :usersIds")
     List<UserPhoto> findAllByUserId(List<String> usersIds);
+
+    Optional<UserPhoto> findByFileName(String fileName);
 }

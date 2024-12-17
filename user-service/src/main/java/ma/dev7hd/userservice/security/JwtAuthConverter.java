@@ -15,7 +15,7 @@ import java.util.Set;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
-//@Component
+@Component
 public class JwtAuthConverter implements Converter<Jwt, AbstractAuthenticationToken> {
     private final JwtGrantedAuthoritiesConverter jwtGrantedAuthoritiesConverter=new JwtGrantedAuthoritiesConverter();
 
@@ -37,8 +37,6 @@ public class JwtAuthConverter implements Converter<Jwt, AbstractAuthenticationTo
         }
         realmAccess = jwt.getClaim("realm_access");
         roles = (Collection<String>) realmAccess.get("roles");
-        System.err.println("realm_access roles");
-        roles.forEach(System.out::println);
         return roles.stream().map(SimpleGrantedAuthority::new).collect(Collectors.toSet());
     }
 }

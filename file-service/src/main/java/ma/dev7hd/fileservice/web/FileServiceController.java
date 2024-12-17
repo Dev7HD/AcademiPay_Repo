@@ -75,8 +75,8 @@ public class FileServiceController {
     }
 
     @GetMapping(value = "/photos/{id}", produces = MediaType.IMAGE_JPEG_VALUE)
-    ResponseEntity<byte[]> getUserPhoto(@PathVariable(name = "id") String userId){
-        PhotoDTO photoDTO = fileProcessingService.getUserPhoto(userId);
+    ResponseEntity<byte[]> getUserPhoto(@PathVariable(name = "id") UUID photoId){
+        PhotoDTO photoDTO = fileProcessingService.getUserPhoto(photoId);
         return generateUserPhotoResponse(photoDTO);
     }
 
@@ -90,5 +90,10 @@ public class FileServiceController {
         } else {
             throw new RuntimeException("Error processing photo!!");
         }
+    }
+
+    @GetMapping("/photos/default")
+    UUID getDefaultPhotoId(){
+        return fileProcessingService.getDefaultPhotoId();
     }
 }

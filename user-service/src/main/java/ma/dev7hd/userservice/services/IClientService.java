@@ -1,11 +1,12 @@
 package ma.dev7hd.userservice.services;
 
+import jakarta.ws.rs.core.Response;
 import ma.dev7hd.userservice.entities.User;
 
 public interface IClientService {
-    void registerUserWithKeycloak(User newUser);
+    Response registerUserWithKeycloak(User newUser);
 
-    void deleteKCUser(String userId);
+    int deleteKCUser(String userId);
 
     void updateKCUser(User user);
 

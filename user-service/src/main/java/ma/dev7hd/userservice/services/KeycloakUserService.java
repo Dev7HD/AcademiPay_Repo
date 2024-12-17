@@ -16,129 +16,128 @@ import org.keycloak.representations.idm.RoleRepresentation;
 import org.keycloak.representations.idm.UserRepresentation;
 import org.springframework.stereotype.Service;
 
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 
 
 @Service
-public class ClientService implements IClientService {
+public class KeycloakUserService implements IClientService {
 
     private final RealmResource realmResource;
 
     private final String DEFAULT_PASSWORD = "123456";
 
-    public ClientService(Keycloak keycloak) {
+    public KeycloakUserService(Keycloak keycloak) {
         this.realmResource = keycloak.realm(KeycloakConfig.realm);
     }
 
+    /**
+     * Registers a user in Keycloak with roles based on their type.
+     *
+     * @param user the User object to be registered in Keycloak
+     * @return response from Keycloak
+     */
     @Override
     @Transactional
-    public void registerUserWithKeycloak(User savedUser) {
+    public Response registerUserWithKeycloak(User user) {
+        if (user == null) {
+            throw new IllegalArgumentException("User must not be null");
+        }
 
-        // Register client as Keycloak user
+        // Prepare Keycloak user representation
         UserRepresentation keycloakUser = new UserRepresentation();
-        assert savedUser != null;
-        keycloakUser.setUsername(savedUser.getId());
-        keycloakUser.setEmailVerified(true);
-        keycloakUser.setEmail(savedUser.getEmail());
-        keycloakUser.setFirstName(savedUser.getFirstName());
-        keycloakUser.setLastName(savedUser.getLastName());
+        keycloakUser.setUsername(user.getId());
+        keycloakUser.setEmail(user.getEmail());
+        keycloakUser.setFirstName(user.getFirstName());
+        keycloakUser.setLastName(user.getLastName());
         keycloakUser.setEnabled(true);
+        keycloakUser.setEmailVerified(true);
 
-        RoleRepresentation adminRole = realmResource.roles().get("ADMIN").toRepresentation();
-        RoleRepresentation studentRole = realmResource.roles().get("STUDENT").toRepresentation();
-
-        // Password and other attributes can be set here
-        CredentialRepresentation passwordCredentials = createPasswordCredentials(DEFAULT_PASSWORD);
-        keycloakUser.setCredentials(Collections.singletonList(passwordCredentials));
-
-
-        // Add user to Keycloak
-        Response response = null;
+        // Set default password
+        keycloakUser.setCredentials(Collections.singletonList(createPasswordCredentials(DEFAULT_PASSWORD)));
 
         try {
-            response = realmResource.users().create(keycloakUser);
+            // Create user in Keycloak
+            Response response = realmResource.users().create(keycloakUser);
 
+            if (response.getStatus() != 201) {
+                System.out.println("KC User Error: " + keycloakUser.getEmail());
+                //throw new RuntimeException("Failed to create Keycloak user: " + response.getStatusInfo().toString());
+            }
+
+            // Retrieve the created user's ID
+            String userId = realmResource.users().search(user.getId(), true).get(0).getId();
+
+            // Assign roles based on user type
+            List<RoleRepresentation> roles = new ArrayList<>();
+            if (user instanceof Admin) {
+                roles.add(realmResource.roles().get("ADMIN").toRepresentation());
+            }
+
+            realmResource.users().get(userId).roles().realmLevel().add(roles);
+
+
+            return response;
+        } catch (Exception e) {
+            throw new RuntimeException("Error registering user in Keycloak: " + e.getMessage(), e);
+        }
+    }
+
+    @Override
+    public int deleteKCUser(String userId) {
+        System.out.println("Start deleting user from Keycloak...");
+
+        try {
             UsersResource usersResource = realmResource.users();
-            UserRepresentation userRepresentation = usersResource.searchByEmail(savedUser.getEmail(), true).getFirst(); // Replace with appropriate search
-            String userId = userRepresentation.getId();
+            List<UserRepresentation> userRepresentations = usersResource.searchByUsername(userId.toLowerCase(), true);
 
-            if (savedUser instanceof Admin) {
-                usersResource.get(userId).roles().realmLevel().add(List.of(adminRole, studentRole));
+            if (userRepresentations.isEmpty()) {
+                System.err.println("No such Keycloak user with username: " + userId);
+                return 0;
+            }
+
+            UserRepresentation user = userRepresentations.get(0);
+
+            // Delete the user and revoke sessions in one operation
+            Response deleteResponse = usersResource.delete(user.getId());
+            if (deleteResponse.getStatus() == Response.Status.NO_CONTENT.getStatusCode()) {
+                System.out.printf("User successfully deleted from Keycloak: Email:%s\n", user.getEmail());
+                return deleteResponse.getStatus();
             } else {
-                usersResource.get(userId).roles().realmLevel().add(List.of(studentRole));
-                //List<RoleRepresentation> assignedRoles = usersResource.get(userId).roles().realmLevel().listAll();
+                System.err.println("Failed to delete user: " + deleteResponse.getStatusInfo().getReasonPhrase());
+                return deleteResponse.getStatus();
             }
 
         } catch (Exception e) {
-            System.err.println("Creating client error: " + e.getMessage());
-        }
-
-        if (response == null || response.getStatus() != 201) {
-            System.err.println("Couldn't create Keycloak user.");
-        } else {
-            System.out.println("Keycloak user created.... verify in keycloak!");
-        }
-
-    }
-
-    @Override
-    public void deleteKCUser(String userId) {
-
-        System.out.println("Start deleting user from Keycloak...");
-
-        UsersResource usersResource = realmResource.users();
-        List<UserRepresentation> userRepresentations = usersResource.searchByUsername(userId.toLowerCase(), true);
-        if (userRepresentations.isEmpty()){
-            System.err.println("No such keycloak user with username: " + userId);
-            return;
-        }
-
-        UserRepresentation user = userRepresentations.getFirst();
-
-        System.out.println("User found in Keycloak...");
-        System.out.println("User email: " + user.getEmail());
-        System.out.println("User id: " + user.getId());
-
-        try {
-            // Delete the user from Keycloak
-            realmResource.users()
-                    .delete(user.getId());
-            System.out.println("User has been deleted.");
-
-            // Log out the user by revoking sessions
-            realmResource.users()
-                    .get(user.getId())
-                    .logout();
-            System.out.println("User has been logged out.");
-        } catch (Exception e) {
-            System.err.println("Couldn't delete Keycloak user: " + e.getMessage());
+            System.err.println("Error while deleting Keycloak user: " + e.getMessage());
+            return 0;
         }
     }
+
 
     @Override
     public void updateKCUser(User user) {
         System.out.println("Start updating Keycloak user...");
         UsersResource usersResource = realmResource.users();
-        UserRepresentation kcUser = usersResource.searchByEmail(user.getEmail(), true).getFirst();
-        System.out.println("User found in Keycloak...");
-        System.out.println("User email: " + user.getEmail());
-        System.out.println("User id: " + user.getId());
-
-        kcUser.setFirstName(user.getFirstName());
-        kcUser.setLastName(user.getLastName());
 
         try {
-            realmResource
-                    .users()
-                    .get(kcUser.getId())
-                    .update(kcUser);
-        } catch (Exception e) {
-            System.err.println("Updating User information failed: \n" + e.getMessage());
-        }
+            UserRepresentation kcUser = usersResource.searchByUsername(user.getId().toLowerCase(), true).stream()
+                    .findFirst()
+                    .orElseThrow(() -> new RuntimeException("User not found in Keycloak"));
 
-        System.out.println("User updated successfully.");
+            kcUser.setFirstName(user.getFirstName());
+            kcUser.setLastName(user.getLastName());
+            kcUser.setEmail(user.getEmail());
+
+            usersResource.get(kcUser.getId()).update(kcUser);
+            System.out.println("User updated successfully.");
+        } catch (Exception e) {
+            System.err.println("Updating User information failed: " + e.getMessage());
+            throw new RuntimeException("Error updating Keycloak user: " + e.getMessage(), e);
+        }
     }
+
 
     @Override
     public boolean toggleKCUserAccount(String email) {
@@ -186,7 +185,7 @@ public class ClientService implements IClientService {
                     .get(userRepresentationId) // User ID to reset password for
                     .resetPassword(createPasswordCredentials(defaultPassword));
         } else {
-            throw new RuntimeException("Finding keycloak user faild");
+            throw new RuntimeException("Finding keycloak user failed");
         }
     }
 
